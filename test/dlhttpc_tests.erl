@@ -100,8 +100,10 @@ test_no(N, Tests) ->
 
 start_app() ->
     application:start(crypto),
+    application:start(asn1),
     application:start(public_key),
     ok = application:start(ssl),
+    application:start(dispcount),
     ok = dlhttpc:start().
 
 stop_app(_) ->
@@ -484,7 +486,7 @@ partial_upload_chunked() ->
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response1)),
     ?assertEqual("This is chunky stuff!",
         dlhttpc_lib:header_value("x-test-orig-body", headers(Response1))),
-    ?assertEqual(element(2, Trailer), 
+    ?assertEqual(element(2, Trailer),
         dlhttpc_lib:header_value("x-test-orig-trailer-1", headers(Response1))),
     % Make sure it works with no body part in the original request as well
     Headers = [{"Transfer-Encoding", "chunked"}],
@@ -497,7 +499,7 @@ partial_upload_chunked() ->
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response2)),
     ?assertEqual("This is chunky stuff!",
         dlhttpc_lib:header_value("x-test-orig-body", headers(Response2))),
-    ?assertEqual(element(2, Trailer), 
+    ?assertEqual(element(2, Trailer),
         dlhttpc_lib:header_value("x-test-orig-trailer-1", headers(Response2))).
 
 partial_upload_chunked_no_trailer() ->
