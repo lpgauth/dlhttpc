@@ -33,7 +33,7 @@
 -module(dlhttpc).
 -behaviour(application).
 
--export([start/0, stop/0, request/4, request/5, request/6, request/9]).
+-export([start/0, stop/0, request/4, request/5, request/6, request/9, kill_client/1]).
 -export([start/2, stop/1]).
 -export([
         send_body_part/2,
@@ -339,16 +339,13 @@ request(URL, Method, Hdrs, Body, Timeout, Options) ->
     headers(), iolist(), pos_integer(), [option()]) -> result().
 request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options) ->
     verify_options(Options, []),
-    ReqId = now(),
+    ReqId = {self(), os:timestamp()},
     case proplists:is_defined(stream_to, Options) of
         true ->
             StreamTo = proplists:get_value(stream_to, Options),
             Args = [ReqId, StreamTo, Host, Port, Ssl, Path, Method, Hdrs, Body, Options],
             Pid = spawn(dlhttpc_client, request, Args),
-            spawn(fun() ->
-                R = kill_client_after(Pid, Timeout),
-                StreamTo ! {response, ReqId, Pid, R}
-            end),
+            erlang:send_after(Timeout, dlhttpc_kill_manager, {kill_client, Pid}),
             {ReqId, Pid};
         false ->
             Args = [ReqId, self(), Host, Port, Ssl, Path, Method, Hdrs, Body, Options],
@@ -558,23 +555,6 @@ kill_client(Pid) ->
             {error, timeout};
         {'DOWN', _, process, Pid, Reason}  ->
             erlang:error(Reason)
-    end.
-
-kill_client_after(Pid, Timeout) ->
-    erlang:monitor(process, Pid),
-    receive
-        {'DOWN', _, process, Pid, _Reason} -> exit(normal)
-    after Timeout ->
-        catch unlink(Pid), % or we'll kill ourself :O
-        exit(Pid, timeout),
-        receive
-            {'DOWN', _, process, Pid, timeout} ->
-                {error, timeout};
-            {'DOWN', _, process, Pid, Reason}  ->
-                erlang:error(Reason)
-        after 1000 ->
-            exit(normal) % silent failure!
-        end
     end.
 
 -spec verify_options(options(), [term()]) -> ok | none().
