@@ -354,6 +354,7 @@ body_type(Hdrs) ->
         undefined ->
             TransferEncoding =  dlhttpc_lib:header_value(<<"Transfer-encoding">>, Hdrs, "undefined"),
             case TransferEncoding of
+                <<"Chunked">> -> chunked;
                 <<"chunked">> -> chunked;
                 _         -> infinite
             end;
@@ -606,12 +607,14 @@ read_infinite_body_part(#client_state{socket = Socket, ssl = Ssl}) ->
 check_infinite_response({1, Minor}, Hdrs) when Minor >= 1 ->
     HdrValue = dlhttpc_lib:header_value(<<"Connection">>, Hdrs, <<"keep-alive">>),
     case HdrValue of
+        <<"Close">> -> ok;
         <<"close">> -> ok;
         _       -> erlang:error(no_content_length)
     end;
 check_infinite_response(_, Hdrs) ->
     HdrValue = dlhttpc_lib:header_value(<<"Connection">>, Hdrs, <<"close">>),
     case HdrValue of
+        <<"Keep-Alive">> -> erlang:error(no_content_length);
         <<"keep-alive">> -> erlang:error(no_content_length);
         _            -> ok
     end.
@@ -631,22 +634,39 @@ read_until_closed(Socket, Acc, Hdrs, Ssl) ->
     end.
 
 maybe_close_socket(Socket, Ssl, {1, Minor}, ReqHdrs, RespHdrs) when Minor >= 1->
-    ClientConnection = ?CONNECTION_HDR(ReqHdrs, "keep-alive"),
-    ServerConnection = ?CONNECTION_HDR(RespHdrs, "keep-alive"),
-    if
-        ClientConnection =:= "close"; ServerConnection =:= "close" ->
+    ClientConnection = ?CONNECTION_HDR(ReqHdrs, <<"keep-alive">>),
+    ServerConnection = ?CONNECTION_HDR(RespHdrs, <<"keep-alive">>),
+    case {closed(ClientConnection), closed(ServerConnection)} of
+        {true, _} ->
             dlhttpc_sock:close(Socket, Ssl),
             undefined;
-        ClientConnection =/= "close", ServerConnection =/= "close" ->
+        {_, true} ->
+            dlhttpc_sock:close(Socket, Ssl),
+            undefined;
+        _Else ->
             Socket
     end;
 maybe_close_socket(Socket, Ssl, _, ReqHdrs, RespHdrs) ->
-    ClientConnection = ?CONNECTION_HDR(ReqHdrs, "keep-alive"),
-    ServerConnection = ?CONNECTION_HDR(RespHdrs, "close"),
-    if
-        ClientConnection =:= "close"; ServerConnection =/= "keep-alive" ->
+    ClientConnection = ?CONNECTION_HDR(ReqHdrs, <<"keep-alive">>),
+    ServerConnection = ?CONNECTION_HDR(RespHdrs, <<"close">>),
+    case {closed(ClientConnection), keep_alive(ServerConnection)} of
+        {false, true} ->
+            Socket;
+        _Else ->
             dlhttpc_sock:close(Socket, Ssl),
-            undefined;
-        ClientConnection =/= "close", ServerConnection =:= "keep-alive" ->
-            Socket
+            undefined
+    end.
+
+closed(HeaderValue) ->
+    case HeaderValue of
+        <<"Close">> -> true;
+        <<"close">> -> true;
+        _Else -> false
+    end.
+
+keep_alive(HeaderValue) ->
+    case HeaderValue of
+        <<"Keep-Alive">> -> true;
+        <<"keep-alive">> -> true;
+        _Else -> false
     end.
