@@ -207,9 +207,10 @@ add_content_headers(Hdrs, _Body, true) ->
         {undefined, undefined} ->
             [{<<"Transfer-Encoding">>, <<"chunked">>} | Hdrs];
         {undefined, TransferEncoding} ->
-            case string:to_lower(TransferEncoding) of
-            <<"chunked">> -> Hdrs;
-            _ -> erlang:error({error, unsupported_transfer_encoding})
+            case TransferEncoding of
+                <<"Chunked">> -> Hdrs;
+                <<"chunked">> -> Hdrs;
+                _ -> erlang:error({error, unsupported_transfer_encoding})
             end;
         {_Length, undefined} ->
             Hdrs;
@@ -226,9 +227,9 @@ add_host(Hdrs, Host, Port) ->
     end.
 
 is_chunked(Hdrs) ->
-    TransferEncoding = string:to_lower(
-        header_value(<<"Transfer-Encoding">>, Hdrs, "undefined")),
+    TransferEncoding = header_value(<<"Transfer-Encoding">>, Hdrs, "undefined"),
     case TransferEncoding of
+        <<"Chunked">> -> true;
         <<"chunked">> -> true;
         _ -> false
     end.

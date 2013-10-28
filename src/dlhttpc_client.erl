@@ -636,7 +636,7 @@ read_until_closed(Socket, Acc, Hdrs, Ssl) ->
 maybe_close_socket(Socket, Ssl, {1, Minor}, ReqHdrs, RespHdrs) when Minor >= 1->
     ClientConnection = ?CONNECTION_HDR(ReqHdrs, <<"keep-alive">>),
     ServerConnection = ?CONNECTION_HDR(RespHdrs, <<"keep-alive">>),
-    case {closed(ClientConnection), closed(ServerConnection)} of
+    case {close(ClientConnection), close(ServerConnection)} of
         {true, _} ->
             dlhttpc_sock:close(Socket, Ssl),
             undefined;
@@ -649,7 +649,7 @@ maybe_close_socket(Socket, Ssl, {1, Minor}, ReqHdrs, RespHdrs) when Minor >= 1->
 maybe_close_socket(Socket, Ssl, _, ReqHdrs, RespHdrs) ->
     ClientConnection = ?CONNECTION_HDR(ReqHdrs, <<"keep-alive">>),
     ServerConnection = ?CONNECTION_HDR(RespHdrs, <<"close">>),
-    case {closed(ClientConnection), keep_alive(ServerConnection)} of
+    case {close(ClientConnection), keep_alive(ServerConnection)} of
         {false, true} ->
             Socket;
         _Else ->
@@ -657,7 +657,7 @@ maybe_close_socket(Socket, Ssl, _, ReqHdrs, RespHdrs) ->
             undefined
     end.
 
-closed(HeaderValue) ->
+close(HeaderValue) ->
     case HeaderValue of
         <<"Close">> -> true;
         <<"close">> -> true;
