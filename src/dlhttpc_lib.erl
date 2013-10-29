@@ -116,10 +116,11 @@ split_host(HostPortPath) ->
     PortPath2 =
         case binary:split(HostPortPath, <<":">>, [trim]) of
             [HostPath] ->
+                io:format("hostpath: ~p~n", [HostPath]),
                 case binary:split(HostPath, <<"/">>, [trim]) of
                     [Host] ->
                         <<"/">>;
-                    [Host | Path] ->
+                    [Host, Path] ->
                         <<"/", Path/binary>>
                 end;
             [Host, PortPath] ->
