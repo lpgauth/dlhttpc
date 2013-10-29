@@ -62,7 +62,7 @@
     }).
 
 -define(CONNECTION_HDR(HDRS, DEFAULT),
-    string:to_lower(dlhttpc_lib:header_value("connection", HDRS, DEFAULT))).
+    dlhttpc_lib:header_value(<<"Connection">>, HDRS, DEFAULT)).
 
 -spec request(term(), pid(), string(), 1..65535, true | false, string(),
         string() | atom(), headers(), iolist(), [option()]) -> no_return().
@@ -92,7 +92,7 @@ request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     end,
     case Result of
         {response, _, _, {ok, {no_return, _}}} -> ok;
-        _Else                               -> From ! Result
+        _Else -> From ! Result
     end,
     % Don't send back {'EXIT', self(), normal} if the process
     % calling us is trapping exits
@@ -104,10 +104,9 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     PartialUpload = proplists:is_defined(partial_upload, Options),
     PartialDownload = proplists:is_defined(partial_download, Options),
     PartialDownloadOptions = proplists:get_value(partial_download, Options, []),
-    NormalizedMethod = dlhttpc_lib:normalize_method(Method),
     MaxConnections = proplists:get_value(max_connections, Options, 10),
     ConnectionTimeout = proplists:get_value(connection_timeout, Options, infinity),
-    {ChunkedUpload, Request} = dlhttpc_lib:format_request(Path, NormalizedMethod,
+    {ChunkedUpload, Request} = dlhttpc_lib:format_request(Path, Method,
         Hdrs, Host, Port, Body, PartialUpload),
     ConnectOptions = proplists:get_value(connect_options, Options, []),
     SockOpts = [binary, {packet, http}, {active, false} | ConnectOptions],
@@ -126,7 +125,7 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
         host = Host,
         port = Port,
         ssl = Ssl,
-        method = NormalizedMethod,
+        method = Method,
         request = Request,
         requester = From,
         request_headers = Hdrs,
@@ -250,7 +249,7 @@ check_send_result(#client_state{socket = Sock, ssl = Ssl}, {error, Reason}) ->
     throw(Reason).
 
 read_response(#client_state{socket = Socket, ssl = Ssl} = State) ->
-    dlhttpc_sock:setopts(Socket, [{packet, http}], Ssl),
+    dlhttpc_sock:setopts(Socket, [{packet, http}, binary], Ssl),
     read_response(State, nil, {nil, nil}, []).
 
 read_response(State, Vsn, {StatusCode, _} = Status, Hdrs) ->
@@ -258,10 +257,10 @@ read_response(State, Vsn, {StatusCode, _} = Status, Hdrs) ->
     Ssl = State#client_state.ssl,
     case dlhttpc_sock:recv(Socket, Ssl) of
         {ok, {http_response, NewVsn, NewStatusCode, Reason}} ->
-            NewStatus = {NewStatusCode, Reason},
+            NewStatus = {NewStatusCode, list_to_binary(Reason)},
             read_response(State, NewVsn, NewStatus, Hdrs);
         {ok, {http_header, _, Name, _, Value}} ->
-            Header = {dlhttpc_lib:maybe_atom_to_list(Name), Value},
+            Header = {dlhttpc_lib:to_binary(Name), list_to_binary(Value)},
             read_response(State, Vsn, Status, [Header | Hdrs]);
         {ok, http_eoh} when StatusCode >= 100, StatusCode =< 199 ->
             % RFC 2616, section 10.1:
@@ -324,14 +323,14 @@ handle_response_body(#client_state{partial_download = true} = State, Vsn,
             {Status, Hdrs, undefined}
     end.
 
-has_body("HEAD", _, _) ->
+has_body(<<"HEAD">>, _, _) ->
     % HEAD responses aren't allowed to include a body
     false;
-has_body("OPTIONS", _, Hdrs) ->
+has_body(<<"OPTIONS">>, _, Hdrs) ->
     % OPTIONS can include a body, if Content-Length or Transfer-Encoding
     % indicates it
-    ContentLength = dlhttpc_lib:header_value("content-length", Hdrs),
-    TransferEncoding = dlhttpc_lib:header_value("transfer-encoding", Hdrs),
+    ContentLength = dlhttpc_lib:header_value(<<"Content-Length">>, Hdrs),
+    TransferEncoding = dlhttpc_lib:header_value(<<"Transfer-Encoding">>, Hdrs),
     case {ContentLength, TransferEncoding} of
         {undefined, undefined} -> false;
         {_, _}                 -> true
@@ -351,17 +350,16 @@ body_type(Hdrs) ->
     %   the time
     % * If neither of this is true, we need to read until the socket is
     %   closed (AFAIK, this was common in versions before 1.1).
-    case dlhttpc_lib:header_value("content-length", Hdrs) of
+    case dlhttpc_lib:header_value(<<"Content-Length">>, Hdrs) of
         undefined ->
-            TransferEncoding = string:to_lower(
-                dlhttpc_lib:header_value("transfer-encoding", Hdrs, "undefined")
-            ),
+            TransferEncoding =  dlhttpc_lib:header_value(<<"Transfer-encoding">>, Hdrs, "undefined"),
             case TransferEncoding of
-                "chunked" -> chunked;
+                <<"Chunked">> -> chunked;
+                <<"chunked">> -> chunked;
                 _         -> infinite
             end;
         ContentLength ->
-            {fixed_length, list_to_integer(ContentLength)}
+            {fixed_length, binary_to_integer(ContentLength)}
     end.
 
 read_partial_body(State, _Vsn, Hdrs, chunked) ->
@@ -563,7 +561,7 @@ read_trailers(Socket, Ssl, Trailers, Hdrs) ->
         {ok, http_eoh} ->
             {Trailers, Hdrs};
         {ok, {http_header, _, Name, _, Value}} ->
-            Header = {dlhttpc_lib:maybe_atom_to_list(Name), Value},
+            Header = {dlhttpc_lib:to_binary(Name), Value},
             read_trailers(Socket, Ssl, [Header | Trailers], [Header | Hdrs]);
         {error, {http_error, Data}} ->
             erlang:error({bad_trailer, Data})
@@ -607,15 +605,17 @@ read_infinite_body_part(#client_state{socket = Socket, ssl = Ssl}) ->
     end.
 
 check_infinite_response({1, Minor}, Hdrs) when Minor >= 1 ->
-    HdrValue = dlhttpc_lib:header_value("connection", Hdrs, "keep-alive"),
-    case string:to_lower(HdrValue) of
-        "close" -> ok;
+    HdrValue = dlhttpc_lib:header_value(<<"Connection">>, Hdrs, <<"keep-alive">>),
+    case HdrValue of
+        <<"Close">> -> ok;
+        <<"close">> -> ok;
         _       -> erlang:error(no_content_length)
     end;
 check_infinite_response(_, Hdrs) ->
-    HdrValue = dlhttpc_lib:header_value("connection", Hdrs, "close"),
-    case string:to_lower(HdrValue) of
-        "keep-alive" -> erlang:error(no_content_length);
+    HdrValue = dlhttpc_lib:header_value(<<"Connection">>, Hdrs, <<"close">>),
+    case HdrValue of
+        <<"Keep-Alive">> -> erlang:error(no_content_length);
+        <<"keep-alive">> -> erlang:error(no_content_length);
         _            -> ok
     end.
 
@@ -634,22 +634,39 @@ read_until_closed(Socket, Acc, Hdrs, Ssl) ->
     end.
 
 maybe_close_socket(Socket, Ssl, {1, Minor}, ReqHdrs, RespHdrs) when Minor >= 1->
-    ClientConnection = ?CONNECTION_HDR(ReqHdrs, "keep-alive"),
-    ServerConnection = ?CONNECTION_HDR(RespHdrs, "keep-alive"),
-    if
-        ClientConnection =:= "close"; ServerConnection =:= "close" ->
+    ClientConnection = ?CONNECTION_HDR(ReqHdrs, <<"keep-alive">>),
+    ServerConnection = ?CONNECTION_HDR(RespHdrs, <<"keep-alive">>),
+    case {close(ClientConnection), close(ServerConnection)} of
+        {true, _} ->
             dlhttpc_sock:close(Socket, Ssl),
             undefined;
-        ClientConnection =/= "close", ServerConnection =/= "close" ->
+        {_, true} ->
+            dlhttpc_sock:close(Socket, Ssl),
+            undefined;
+        _Else ->
             Socket
     end;
 maybe_close_socket(Socket, Ssl, _, ReqHdrs, RespHdrs) ->
-    ClientConnection = ?CONNECTION_HDR(ReqHdrs, "keep-alive"),
-    ServerConnection = ?CONNECTION_HDR(RespHdrs, "close"),
-    if
-        ClientConnection =:= "close"; ServerConnection =/= "keep-alive" ->
+    ClientConnection = ?CONNECTION_HDR(ReqHdrs, <<"keep-alive">>),
+    ServerConnection = ?CONNECTION_HDR(RespHdrs, <<"close">>),
+    case {close(ClientConnection), keep_alive(ServerConnection)} of
+        {false, true} ->
+            Socket;
+        _Else ->
             dlhttpc_sock:close(Socket, Ssl),
-            undefined;
-        ClientConnection =/= "close", ServerConnection =:= "keep-alive" ->
-            Socket
+            undefined
+    end.
+
+close(HeaderValue) ->
+    case HeaderValue of
+        <<"Close">> -> true;
+        <<"close">> -> true;
+        _Else -> false
+    end.
+
+keep_alive(HeaderValue) ->
+    case HeaderValue of
+        <<"Keep-Alive">> -> true;
+        <<"keep-alive">> -> true;
+        _Else -> false
     end.

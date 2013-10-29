@@ -81,8 +81,8 @@ start_disp(Key = {Host, Port, Ssl}, Args = {MaxConn,ConnTimeout,SockOpts}) ->
     {ok, X} = application:get_env(dlhttpc, maxr),
     {ok, Y} = application:get_env(dlhttpc, maxt),
     AtomKey = case Ssl of
-        true -> list_to_atom("dispcount_"++Host++integer_to_list(Port)++"_ssl");
-        false -> list_to_atom("dispcount_"++Host++integer_to_list(Port))
+        true -> list_to_atom("dispcount_"++binary_to_list(Host)++integer_to_list(Port)++"_ssl");
+        false -> list_to_atom("dispcount_"++binary_to_list(Host)++integer_to_list(Port))
     end,
     Res = dispcount:start_dispatch(
             AtomKey,
