@@ -260,7 +260,7 @@ read_response(State, Vsn, {StatusCode, _} = Status, Hdrs) ->
             NewStatus = {NewStatusCode, list_to_binary(Reason)},
             read_response(State, NewVsn, NewStatus, Hdrs);
         {ok, {http_header, _, Name, _, Value}} ->
-            Header = {dlhttpc_lib:maybe_atom_to_binary(Name), list_to_binary(Value)},
+            Header = {dlhttpc_lib:to_binary(Name), list_to_binary(Value)},
             read_response(State, Vsn, Status, [Header | Hdrs]);
         {ok, http_eoh} when StatusCode >= 100, StatusCode =< 199 ->
             % RFC 2616, section 10.1:
@@ -561,7 +561,7 @@ read_trailers(Socket, Ssl, Trailers, Hdrs) ->
         {ok, http_eoh} ->
             {Trailers, Hdrs};
         {ok, {http_header, _, Name, _, Value}} ->
-            Header = {dlhttpc_lib:maybe_atom_to_binary(Name), Value},
+            Header = {dlhttpc_lib:to_binary(Name), Value},
             read_trailers(Socket, Ssl, [Header | Trailers], [Header | Hdrs]);
         {error, {http_error, Data}} ->
             erlang:error({bad_trailer, Data})

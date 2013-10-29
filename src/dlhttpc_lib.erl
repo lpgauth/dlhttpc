@@ -36,7 +36,7 @@
         header_value/2,
         header_value/3
     ]).
--export([maybe_atom_to_binary/1]).
+-export([to_binary/1]).
 
 -export([format_hdrs/1, dec/1]).
 
@@ -84,10 +84,12 @@ header_value(_, [], Default) ->
 %% Will make any item, being an atom or a list, in to a list. If it is a
 %% list, it is simple returned.
 %% @end
--spec maybe_atom_to_binary(atom() | binary()) -> binary().
-maybe_atom_to_binary(Atom) when is_atom(Atom) ->
+-spec to_binary(atom() | binary()) -> binary().
+to_binary(Atom) when is_atom(Atom) ->
     atom_to_binary(Atom, latin1);
-maybe_atom_to_binary(Binary) when is_binary(Binary) ->
+to_binary(List) when is_list(List) ->
+    list_to_binary(List);
+to_binary(Binary) when is_binary(Binary) ->
     Binary.
 
 %% @spec (URL) -> {Host, Port, Path, Ssl}
