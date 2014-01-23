@@ -101,6 +101,6 @@ reconnect(State = #state{init_arg={Host, Port, Ssl, Timeout, SockOpts}}) ->
         {ok, Socket} ->
             {ok, State#state{resource = {ok, Socket}, ssl=Ssl}};
         {error, Reason} ->
-            error_logger:warning_msg("dlhttpc reconnect fail (~p): ~p~n",[{Host,Port,Ssl}, Reason]),
+            error_logger:warning_msg("dlhttpc reconnect fail ~p:~p: ~p", [Host, Port, Reason]),
             {error, Reason, State#state{resource = {error, Reason}, ssl=Ssl}}
     end.
