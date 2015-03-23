@@ -86,7 +86,7 @@ request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
 request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options, Timeout) ->
     Tref = erlang:send_after(Timeout, dlhttpc_kill_manager, {kill_client, self()}),
     try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options),
-    timer:cancel(Tref),
+    erlang:cancel_timer(Tref),
     ok.
 
 try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
