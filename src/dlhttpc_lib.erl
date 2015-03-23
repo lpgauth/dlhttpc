@@ -40,6 +40,8 @@
 
 -export([format_hdrs/1, dec/1]).
 
+-export([lookup/2]).
+
 -include("dlhttpc_types.hrl").
 
 %% @spec header_value(Header, Headers) -> undefined | term()
@@ -247,3 +249,9 @@ maybe_integer_to_binary(Integer) when is_integer(Integer) ->
     integer_to_binary(Integer);
 maybe_integer_to_binary(Binary) when is_binary(Binary) ->
     Binary.
+
+lookup(Key, List) ->
+    case lists:keyfind(Key, 1, List) of
+        false -> undefined;
+        {_, Value} -> Value
+    end.

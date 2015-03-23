@@ -80,6 +80,16 @@
 %%    Option = {connect_timeout, Milliseconds}
 %% @end
 request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
+    try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options),
+    ok.
+
+request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options, Timeout) ->
+    Tref = erlang:send_after(Timeout, dlhttpc_kill_manager, {kill_client, self()}),
+    try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options),
+    timer:cancel(Tref),
+    ok.
+
+try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     Result = try
         execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options)
     catch
@@ -90,14 +100,13 @@ request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
         error:Error ->
             {exit, ReqId, self(), {Error, erlang:get_stacktrace()}}
     end,
+
     case Result of
         {response, _, _, {ok, {no_return, _}}} -> ok;
         _Else -> From ! Result
     end,
-    % Don't send back {'EXIT', self(), normal} if the process
-    % calling us is trapping exits
-    unlink(From),
-    ok.
+
+    unlink(From).
 
 execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     UploadWindowSize = proplists:get_value(partial_upload, Options),

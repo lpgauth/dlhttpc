@@ -340,15 +340,9 @@ request(URL, Method, Hdrs, Body, Timeout, Options) ->
 request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options) ->
     verify_options(Options, []),
     ReqId = {self(), os:timestamp()},
-    case proplists:is_defined(stream_to, Options) of
-        true ->
-            StreamTo = proplists:get_value(stream_to, Options),
-            Args = [ReqId, StreamTo, Host, Port, Ssl, Path, Method, Hdrs, Body, Options],
-            Pid = spawn(dlhttpc_client, request, Args),
-            erlang:send_after(Timeout, dlhttpc_kill_manager, {kill_client, Pid}),
-            {ReqId, Pid};
-        false ->
-            Args = [ReqId, self(), Host, Port, Ssl, Path, Method, Hdrs, Body, Options],
+    case dlhttpc_lib:lookup(stream_to, Options) of
+        undefined ->
+            Args = [ReqId, self(), Host, Port, Ssl, Path, Method, Hdrs, Body, Options, Timeout],
             Pid = spawn_link(dlhttpc_client, request, Args),
             receive
                 {response, ReqId, Pid, R} ->
@@ -365,7 +359,11 @@ request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options) ->
                     exit(Reason)
             after Timeout ->
                     kill_client(Pid)
-            end
+            end;
+        StreamTo ->
+            Args = [ReqId, StreamTo, Host, Port, Ssl, Path, Method, Hdrs, Body, Options],
+            Pid = spawn(dlhttpc_client, request, Args),
+            {ReqId, Pid}
     end.
 
 %% @spec (UploadState :: UploadState, BodyPart :: BodyPart) -> Result
