@@ -342,7 +342,7 @@ request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options) ->
     ReqId = {self(), os:timestamp()},
     case dlhttpc_lib:lookup(stream_to, Options) of
         undefined ->
-            Args = [ReqId, self(), Host, Port, Ssl, Path, Method, Hdrs, Body, Options, Timeout],
+            Args = [ReqId, self(), Host, Port, Ssl, Path, Method, Hdrs, Body, Options],
             Pid = spawn_link(dlhttpc_client, request, Args),
             receive
                 {response, ReqId, Pid, R} ->
