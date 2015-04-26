@@ -88,8 +88,7 @@ start_disp(Key = {Host, Port, Ssl}, Args = {MaxConn,ConnTimeout,SockOpts}) ->
             AtomKey,
             {dlhttpc_handler, {Host,Port,Ssl,ConnTimeout,SockOpts}},
             [{restart,Type},{shutdown,Timeout},
-             {maxr,X},{maxt,Y},{resources, MaxConn},
-             {dispatch_mechanism, round_robin}]
+             {maxr,X},{maxt,Y},{resources, MaxConn}]
             ),
     case Res of
         ok ->
