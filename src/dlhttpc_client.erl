@@ -361,7 +361,7 @@ body_type(Hdrs) ->
     %   closed (AFAIK, this was common in versions before 1.1).
     case dlhttpc_lib:header_value(<<"Content-Length">>, Hdrs) of
         undefined ->
-            TransferEncoding =  dlhttpc_lib:header_value(<<"Transfer-encoding">>, Hdrs, "undefined"),
+            TransferEncoding =  dlhttpc_lib:header_value(<<"Transfer-Encoding">>, Hdrs, "undefined"),
             case TransferEncoding of
                 <<"Chunked">> -> chunked;
                 <<"chunked">> -> chunked;
@@ -375,7 +375,7 @@ read_partial_body(State, _Vsn, Hdrs, chunked) ->
     Window = State#client_state.download_window,
     read_partial_chunked_body(State, Hdrs, Window, 0, [], 0);
 read_partial_body(State, Vsn, Hdrs, infinite) ->
-    % check_infinite_response(Vsn, Hdrs),
+    check_infinite_response(Vsn, Hdrs),
     read_partial_infinite_body(State, Hdrs, State#client_state.download_window);
 read_partial_body(State, _Vsn, Hdrs, {fixed_length, ContentLength}) ->
     read_partial_finite_body(State, Hdrs, ContentLength,
