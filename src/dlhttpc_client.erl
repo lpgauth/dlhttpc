@@ -513,7 +513,7 @@ reply_chunked_part(#client_state{requester = Pid}, Buffer, Window) ->
     Pid ! {body_part, self(), list_to_binary(lists:reverse(Buffer))},
     receive
         {ack, Pid} ->  Window;
-        {'DOWN', _, process, Pid, _} -> exit(normal)
+        {'DOWN', _, process, Pid, _} -> dlhttpc_lib:dec(Window)
     after 0 ->
         dlhttpc_lib:dec(Window)
     end.
