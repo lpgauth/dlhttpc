@@ -99,4 +99,3 @@ start_disp(Key = {Host, Port, Ssl}, Args = {MaxConn,ConnTimeout,SockOpts}) ->
         already_started ->
             find_disp(Key, Args)
     end.
-

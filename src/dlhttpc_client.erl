@@ -33,7 +33,7 @@
 %%% not be called directly since it should be spawned by the dlhttpc module.
 -module(dlhttpc_client).
 
--export([request/10]).
+-export([request/10, request/11]).
 
 -include("dlhttpc_types.hrl").
 
@@ -114,7 +114,7 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     PartialDownload = proplists:is_defined(partial_download, Options),
     PartialDownloadOptions = dlhttpc_lib:lookup(partial_download, Options, []),
     MaxConnections = dlhttpc_lib:lookup(max_connections, Options, 10),
-    ConnectionTimeout = dlhttpc_lib:lookup(connection_timeout, Options, infinity),
+    ConnectTimeout = dlhttpc_lib:lookup(connect_timeout, Options, infinity),
     {ChunkedUpload, Request} = dlhttpc_lib:format_request(Path, Method,
         Hdrs, Host, Port, Body, PartialUpload),
     ConnectOptions = dlhttpc_lib:lookup(connect_options, Options, []),
@@ -124,7 +124,7 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
             bypass ->
                 {undefined, undefined};
             Number when is_integer(Number) ->
-                case dlhttpc_disp:checkout(Host, Port, Ssl, MaxConnections, ConnectionTimeout, SockOpts) of
+                case dlhttpc_disp:checkout(Host, Port, Ssl, MaxConnections, ConnectTimeout, SockOpts) of
                     {ok, Ref, S} -> {Ref, S}; % Re-using HTTP/1.1 connections
                     {error, CheckoutErr} -> throw(CheckoutErr)
                 end
@@ -140,8 +140,7 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
         request_headers = Hdrs,
         socket_ref = SocketRef,
         socket = Socket,
-        connect_timeout = dlhttpc_lib:lookup(connect_timeout, Options,
-            infinity),
+        connect_timeout = ConnectTimeout,
         connect_options = ConnectOptions,
         attempts = 1 + dlhttpc_lib:lookup(send_retry, Options, 1),
         partial_upload = PartialUpload,
@@ -154,11 +153,12 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
             PartialDownloadOptions, infinity)
     },
     Response = case {MaxConnections, send_request(State)} of
+        {_, {R, undefined}} ->
+            {ok, R};
         {bypass, {R, NewSocket}} ->
             dlhttpc_sock:close(NewSocket, Ssl),
             {ok, R};
-        {_, {R, undefined}} ->
-            {ok, R};
+
         {_, {R, NewSocket}} ->
             % The socket we ended up doing the request over is returned
             % here, it might be the same as Socket, but we don't know.

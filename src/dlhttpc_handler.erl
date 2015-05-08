@@ -45,7 +45,7 @@ checkout(_From, State = #state{given=true}) ->
     {error, busy, State};
 checkout(From, State = #state{resource={ok, Socket}, ssl=Ssl}) ->
     dlhttpc_sock:setopts(Socket, [{active,false}], Ssl),
-    case gen_tcp:controlling_process(Socket, From) of
+    case dlhttpc_sock:controlling_process(Socket, From, Ssl) of
         ok ->
             {ok, {self(), Socket}, State#state{given=true}};
         {error, badarg} -> % caller died
@@ -72,9 +72,11 @@ checkout(From, State) ->
 checkin(Socket, State = #state{resource={ok, Socket}, given=true, ssl=Ssl}) ->
     dlhttpc_sock:setopts(Socket, [{active, once}], Ssl),
     {ok, State#state{given=false}};
-checkin(_Socket, State) ->
+checkin(NewSocket, State = #state{given=true, ssl=Ssl}) ->
+    dlhttpc_sock:setopts(NewSocket, [{active, once}], Ssl),
     %% The socket doesn't match the one we had -- an error happened somewhere
-    {ignore, State}.
+    %% But that's OK, we accept it.
+    {ok, State#state{given=false, resource={ok, NewSocket}}}.
 
 dead(State) ->
     %% aw shoot, someone lost our resource, we gotta create a new one:
