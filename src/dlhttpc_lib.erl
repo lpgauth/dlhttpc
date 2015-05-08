@@ -40,7 +40,7 @@
 
 -export([format_hdrs/1, dec/1]).
 
--export([lookup/2]).
+-export([lookup/2, lookup/3]).
 
 -include("dlhttpc_types.hrl").
 
@@ -251,7 +251,10 @@ maybe_integer_to_binary(Binary) when is_binary(Binary) ->
     Binary.
 
 lookup(Key, List) ->
+    lookup(Key, List, undefined).
+
+lookup(Key, List, Default) ->
     case lists:keyfind(Key, 1, List) of
-        false -> undefined;
+        false -> Default;
         {_, Value} -> Value
     end.

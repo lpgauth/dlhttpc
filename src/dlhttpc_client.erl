@@ -109,15 +109,15 @@ try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     unlink(From).
 
 execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
-    UploadWindowSize = proplists:get_value(partial_upload, Options),
+    UploadWindowSize = dlhttpc_lib:lookup(partial_upload, Options),
     PartialUpload = proplists:is_defined(partial_upload, Options),
     PartialDownload = proplists:is_defined(partial_download, Options),
-    PartialDownloadOptions = proplists:get_value(partial_download, Options, []),
-    MaxConnections = proplists:get_value(max_connections, Options, 10),
-    ConnectionTimeout = proplists:get_value(connection_timeout, Options, infinity),
+    PartialDownloadOptions = dlhttpc_lib:lookup(partial_download, Options, []),
+    MaxConnections = dlhttpc_lib:lookup(max_connections, Options, 10),
+    ConnectionTimeout = dlhttpc_lib:lookup(connection_timeout, Options, infinity),
     {ChunkedUpload, Request} = dlhttpc_lib:format_request(Path, Method,
         Hdrs, Host, Port, Body, PartialUpload),
-    ConnectOptions = proplists:get_value(connect_options, Options, []),
+    ConnectOptions = dlhttpc_lib:lookup(connect_options, Options, []),
     SockOpts = [binary, {packet, http}, {active, false} | ConnectOptions],
     {SocketRef, Socket} =
         case MaxConnections of
@@ -140,17 +140,17 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
         request_headers = Hdrs,
         socket_ref = SocketRef,
         socket = Socket,
-        connect_timeout = proplists:get_value(connect_timeout, Options,
+        connect_timeout = dlhttpc_lib:lookup(connect_timeout, Options,
             infinity),
         connect_options = ConnectOptions,
-        attempts = 1 + proplists:get_value(send_retry, Options, 1),
+        attempts = 1 + dlhttpc_lib:lookup(send_retry, Options, 1),
         partial_upload = PartialUpload,
         upload_window = UploadWindowSize,
         chunked_upload = ChunkedUpload,
         partial_download = PartialDownload,
-        download_window = proplists:get_value(window_size,
+        download_window = dlhttpc_lib:lookup(window_size,
             PartialDownloadOptions, infinity),
-        part_size = proplists:get_value(part_size,
+        part_size = dlhttpc_lib:lookup(part_size,
             PartialDownloadOptions, infinity)
     },
     Response = case {MaxConnections, send_request(State)} of
