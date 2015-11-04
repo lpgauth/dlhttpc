@@ -55,14 +55,6 @@
 -spec start(normal | {takeover, node()} | {failover, node()}, any()) ->
     {ok, pid()}.
 start(_, Opts) ->
-    case lists:member({seed,1}, ssl:module_info(exports)) of
-        true ->
-            % Make sure that the ssl random number generator is seeded
-            % This was new in R13 (ssl-3.10.1 in R13B vs. ssl-3.10.0 in R12B-5)
-            ssl:seed(crypto:rand_bytes(255));
-        false ->
-            ok
-    end,
     if is_list(Opts) -> dlhttpc_sup:start_link(Opts);
        true -> dlhttpc_sup:start_link()
     end.
@@ -118,7 +110,7 @@ stop() ->
 %% `request(URL, Method, Hdrs, <<>>, Timeout)'.
 %% @end
 %% @see request/9
--spec request(string(), string() | atom(), headers(), pos_integer() |
+-spec request(binary(), binary() | atom(), headers(), pos_integer() |
         infinity) -> result().
 request(URL, Method, Hdrs, Timeout) ->
     request(URL, Method, Hdrs, [], Timeout, []).
@@ -142,7 +134,7 @@ request(URL, Method, Hdrs, Timeout) ->
 %% `request(URL, Method, Hdrs, Body, Timeout, [])'.
 %% @end
 %% @see request/9
--spec request(string(), string() | atom(), headers(), iolist(),
+-spec request(binary(), binary() | atom(), headers(), iolist(),
         pos_integer() | infinity) -> result().
 request(URL, Method, Hdrs, Body, Timeout) ->
     request(URL, Method, Hdrs, Body, Timeout, []).
@@ -187,7 +179,7 @@ request(URL, Method, Hdrs, Body, Timeout) ->
 %% `scheme://host[:port][/path]'.
 %% @end
 %% @see request/9
--spec request(string(), string() | atom(), headers(), iolist(),
+-spec request(binary(), binary() | atom(), headers(), iolist(),
         pos_integer() | infinity, [option()]) -> result().
 request(URL, Method, Hdrs, Body, Timeout, Options) ->
     {Host, Port, Path, Ssl} = dlhttpc_lib:parse_url(URL),
@@ -335,10 +327,9 @@ request(URL, Method, Hdrs, Body, Timeout, Options) ->
 %% {@link get_body_part/2} can be used to read body parts in the calling
 %% process.
 %% @end
--spec request(string(), 1..65535, true | false, string(), atom() | string(),
+-spec request(binary(), 1..65535, true | false, binary(), atom() | binary(),
     headers(), iolist(), pos_integer(), [option()]) -> result().
 request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options) ->
-    verify_options(Options, []),
     ReqId = {self(), os:timestamp()},
     case dlhttpc_lib:lookup(stream_to, Options) of
         undefined ->
@@ -554,61 +545,3 @@ kill_client(Pid) ->
         {'DOWN', _, process, Pid, Reason}  ->
             erlang:error(Reason)
     end.
-
--spec verify_options(options(), [term()]) -> ok | none().
-verify_options([{send_retry, N} | Options], Errors)
-        when is_integer(N), N >= 0 ->
-    verify_options(Options, Errors);
-verify_options([{connect_timeout, infinity} | Options], Errors) ->
-    verify_options(Options, Errors);
-verify_options([{connect_timeout, MS} | Options], Errors)
-        when is_integer(MS), MS >= 0 ->
-    verify_options(Options, Errors);
-verify_options([{max_connections, N} | Options], Errors)
-        when is_integer(N), N > 0; N =:= bypass ->
-    verify_options(Options, Errors);
-verify_options([{partial_upload, WindowSize} | Options], Errors)
-        when is_integer(WindowSize), WindowSize >= 0 ->
-    verify_options(Options, Errors);
-verify_options([{partial_upload, infinity} | Options], Errors)  ->
-    verify_options(Options, Errors);
-verify_options([{partial_download, DownloadOptions} | Options], Errors)
-        when is_list(DownloadOptions) ->
-    case verify_partial_download(DownloadOptions, []) of
-        [] ->
-            verify_options(Options, Errors);
-        OptionErrors ->
-            NewErrors = [{partial_download, OptionErrors} | Errors],
-            verify_options(Options, NewErrors)
-    end;
-verify_options([{connect_options, List} | Options], Errors)
-        when is_list(List) ->
-    verify_options(Options, Errors);
-verify_options([{stream_to, Pid} | Options], Errors) when is_pid(Pid) ->
-    verify_options(Options, Errors);
-verify_options([Option | Options], Errors) ->
-    verify_options(Options, [Option | Errors]);
-verify_options([], []) ->
-    ok;
-verify_options([], Errors) ->
-    bad_options(Errors).
-
--spec bad_options([term()]) -> no_return().
-bad_options(Errors) ->
-    erlang:error({bad_options, Errors}).
-
--spec verify_partial_download(options(), options()) -> options().
-verify_partial_download([{window_size, infinity} | Options], Errors)->
-    verify_partial_download(Options, Errors);
-verify_partial_download([{window_size, Size} | Options], Errors) when
-        is_integer(Size), Size >= 0 ->
-    verify_partial_download(Options, Errors);
-verify_partial_download([{part_size, Size} | Options], Errors) when
-        is_integer(Size), Size >= 0 ->
-    verify_partial_download(Options, Errors);
-verify_partial_download([{part_size, infinity} | Options], Errors) ->
-    verify_partial_download(Options, Errors);
-verify_partial_download([Option | Options], Errors) ->
-    verify_partial_download(Options, [Option | Errors]);
-verify_partial_download([], Errors) ->
-    Errors.

@@ -103,7 +103,7 @@ try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
 
     case Result of
         {response, _, _, {ok, {no_return, _}}} -> ok;
-        _Else -> From ! Result
+        Result -> From ! Result
     end,
 
     unlink(From).
