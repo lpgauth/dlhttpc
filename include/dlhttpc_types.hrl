@@ -1,5 +1,8 @@
 %%% ----------------------------------------------------------------------------
 %%% Copyright (c) 2009, Erlang Training and Consulting Ltd.
+%%% Copyright (c) 2012, Frederic Trottier-Hebert
+%%% Copyright (c) 2015, Louis-Philippe Gauthier
+%%%
 %%% All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
@@ -26,6 +29,9 @@
 
 -type header() :: {string() | atom(), string()}.
 -type headers() :: [header()].
+
+-type result() :: {ok, {{pos_integer(), string()}, headers(), binary()}} |
+    {error, atom()}.
 
 -type socket() :: _.
 
