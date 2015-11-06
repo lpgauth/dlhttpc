@@ -83,7 +83,7 @@ request(URL, Method, Hdrs, Timeout) ->
 request(URL, Method, Hdrs, Body, Timeout) ->
     request(URL, Method, Hdrs, Body, Timeout, []).
 
--spec request(binary(), binary(), headers(), iolist(),
+-spec request(binary(), binary(), headers(), iodata(),
         pos_integer() | infinity, [option()]) -> result().
 
 request(URL, Method, Hdrs, Body, Timeout, Options) ->
@@ -91,7 +91,7 @@ request(URL, Method, Hdrs, Body, Timeout, Options) ->
     request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options).
 
 -spec request(binary(), 1..65535, true | false, binary(), binary(),
-    headers(), iolist(), pos_integer(), [option()]) -> result().
+    headers(), iodata(), pos_integer(), [option()]) -> result().
 
 request(Host, Port, Ssl, Path, Method, Hdrs, Body, Timeout, Options) ->
     ReqId = {self(), os:timestamp()},
