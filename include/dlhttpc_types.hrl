@@ -46,7 +46,7 @@
 
 -type options() :: [option()].
 
--type host() :: string() | {integer(), integer(), integer(), integer()}.
+-type host() :: binary().
 
 -type socket_options() :: [{atom(), term()} | atom()].
 

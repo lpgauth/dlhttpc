@@ -71,19 +71,19 @@ start() ->
 stop() ->
     application:stop(dlhttpc).
 
--spec request(binary(), binary() | atom(), headers(), pos_integer() |
+-spec request(binary(), binary(), headers(), pos_integer() |
     infinity) -> result().
 
 request(URL, Method, Hdrs, Timeout) ->
     request(URL, Method, Hdrs, [], Timeout, []).
 
--spec request(binary(), binary() | atom(), headers(), iolist(),
+-spec request(binary(), binary(), headers(), iolist(),
         pos_integer() | infinity) -> result().
 
 request(URL, Method, Hdrs, Body, Timeout) ->
     request(URL, Method, Hdrs, Body, Timeout, []).
 
--spec request(binary(), binary() | atom(), headers(), iolist(),
+-spec request(binary(), binary(), headers(), iolist(),
         pos_integer() | infinity, [option()]) -> result().
 
 request(URL, Method, Hdrs, Body, Timeout, Options) ->
