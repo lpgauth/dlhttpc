@@ -27,10 +27,10 @@
 %%% ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%% ----------------------------------------------------------------------------
 
--type header() :: {string() | atom(), string()}.
+-type header() :: {binary(), binary()}.
 -type headers() :: [header()].
 
--type result() :: {ok, {{pos_integer(), string()}, headers(), binary()}} |
+-type result() :: {ok, {{pos_integer(), binary()}, headers(), binary()}} |
     {{pid(), erlang:timestamp()}, pid()} | {error, atom()}.
 
 -type socket() :: _.
