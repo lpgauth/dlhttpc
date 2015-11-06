@@ -1,5 +1,7 @@
 %%% ----------------------------------------------------------------------------
 %%% Copyright (c) 2009, Erlang Training and Consulting Ltd.
+%%% Copyright (c) 2015, Louis-Philippe Gauthier
+%%%
 %%% All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
@@ -24,51 +26,28 @@
 %%% ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%% ----------------------------------------------------------------------------
 
-%%% @private
-%%% @author Oscar Hellstrom <oscar@hellstrom.st>
-%%% @doc
-%%% This module implements various library functions used in dlhttpc.
 -module(dlhttpc_lib).
-
--export([
-        parse_url/1,
-        format_request/7,
-        header_value/2,
-        header_value/3
-    ]).
--export([to_binary/1]).
-
--export([format_hdrs/1, dec/1]).
-
--export([lookup/2, lookup/3]).
-
 -include("dlhttpc_types.hrl").
 
-%% @spec header_value(Header, Headers) -> undefined | term()
-%% Header = string()
-%% Headers = [{string(), term()}]
-%% Value = term()
-%% @doc
-%% Returns the value associated with the `Header' in `Headers'.
-%% `Header' must be a lowercase string, since every header is mangled to
-%% check the match.
-%% @end
--spec header_value(string(), [{string(), Value}]) -> undefined | Value.
+-export([
+    format_hdrs/1, dec/1,
+    format_request/7,
+    header_value/2,
+    header_value/3,
+    lookup/2,
+    lookup/3,
+    parse_url/1,
+    to_binary/1
+]).
+
+-spec header_value(binary(), [{binary(), Value}]) -> undefined | Value.
+
 header_value(Hdr, Hdrs) ->
     header_value(Hdr, Hdrs, undefined).
 
-%% @spec header_value(Header, Headers, Default) -> Default | term()
-%% Header = string()
-%% Headers = [{string(), term()}]
-%% Value = term()
-%% Default = term()
-%% @doc
-%% Returns the value associated with the `Header' in `Headers'.
-%% `Header' must be a lowercase string, since every header is mangled to
-%% check the match.  If no match is found, `Default' is returned.
-%% @end
--spec header_value(string(), [{string(), Value}], Default) ->
+-spec header_value(binary(), [{binary(), Value}], Default) ->
     Default | Value.
+
 header_value(Hdr, [{Hdr, Value} | _], _) ->
     Value;
 header_value(Hdr, [{ThisHdr, Value}| Hdrs], Default) ->
@@ -79,14 +58,8 @@ header_value(Hdr, [{ThisHdr, Value}| Hdrs], Default) ->
 header_value(_, [], Default) ->
     Default.
 
-%% @spec (Item) -> OtherItem
-%%   Item = atom() | list()
-%%   OtherItem = list()
-%% @doc
-%% Will make any item, being an atom or a list, in to a list. If it is a
-%% list, it is simple returned.
-%% @end
--spec to_binary(atom() | binary()) -> binary().
+-spec to_binary(atom() | list() | binary()) -> binary().
+
 to_binary(Atom) when is_atom(Atom) ->
     atom_to_binary(Atom, latin1);
 to_binary(List) when is_list(List) ->
@@ -94,16 +67,9 @@ to_binary(List) when is_list(List) ->
 to_binary(Binary) when is_binary(Binary) ->
     Binary.
 
-%% @spec (URL) -> {Host, Port, Path, Ssl}
-%%   URL = string()
-%%   Host = string()
-%%   Port = integer()
-%%   Path = string()
-%%   Ssl = boolean()
-%% @doc
--spec parse_url(string()) -> {string(), integer(), string(), boolean()}.
+-spec parse_url(binary()) -> {binary(), integer(), binary(), boolean()}.
+
 parse_url(URL) ->
-    % XXX This should be possible to do with the re module?
     {Scheme, HostPortPath} = split_scheme(URL),
     {Host, PortPath} = split_host(HostPortPath),
     {Port, Path} = split_port(Scheme, PortPath),
@@ -141,16 +107,10 @@ split_port(_Scheme, PortPath) ->
     end,
     {binary_to_integer(Port), Path2}.
 
-%% @spec (Path, Method, Headers, Host, Port, Body, PartialUpload) -> Request
-%% Path = iolist()
-%% Method = atom() | string()
-%% Headers = [{atom() | string(), string()}]
-%% Host = string()
-%% Port = integer()
-%% Body = iolist()
-%% PartialUpload = true | false
--spec format_request(iolist(), atom() | string(), headers(), string(),
+
+-spec format_request(binary(), binary(), headers(), binary(),
     integer(), iolist(), true | false ) -> {true | false, iolist()}.
+
 format_request(Path, Method, Hdrs, Host, Port, Body, PartialUpload) ->
     AllHdrs = add_mandatory_hdrs(Method, Hdrs, Host, Port, Body, PartialUpload),
     IsChunked = is_chunked(AllHdrs),
@@ -162,6 +122,7 @@ format_request(Path, Method, Hdrs, Host, Port, Body, PartialUpload) ->
     {IsChunked, Request}.
 
 -spec format_hdrs(headers()) -> iolist().
+
 format_hdrs(Headers) ->
     format_hdrs(Headers, []).
 
@@ -239,6 +200,7 @@ is_chunked(Hdrs) ->
     end.
 
 -spec dec(timeout()) -> timeout().
+
 dec(Num) when is_integer(Num) -> Num - 1;
 dec(Else)                     -> Else.
 

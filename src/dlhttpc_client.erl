@@ -1,6 +1,8 @@
 %%% ----------------------------------------------------------------------------
 %%% Copyright (c) 2009, Erlang Training and Consulting Ltd.
 %%% Copyright (c) 2012, Frederic Trottier-Hebert
+%%% Copyright (c) 2015, Louis-Philippe Gauthier
+%%%
 %%% All rights reserved.
 %%%
 %%% Redistribution and use in source and binary forms, with or without
@@ -25,60 +27,44 @@
 %%% ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%% ----------------------------------------------------------------------------
 
-%%% @private
-%%% @author Oscar Hellstrom <oscar@hellstrom.st>
-%%% @author Fred Hebert <mononcqc@ferd.ca>
-%%% @doc
-%%% This module implements the HTTP request handling. This should normally
-%%% not be called directly since it should be spawned by the dlhttpc module.
+
 -module(dlhttpc_client).
-
--export([request/10, request/11]).
-
 -include("dlhttpc_types.hrl").
 
+-export([
+    request/10,
+    request/11
+]).
+
 -record(client_state, {
-        req_id :: term(),
-        host :: string(),
-        port = 80 :: integer(),
-        ssl = false :: true | false,
-        method :: string(),
-        request :: iolist(),
-        request_headers :: headers(),
-        socket_ref,
-        socket,
-        connect_timeout = infinity :: timeout(),
-        connect_options = [] :: [any()],
-        attempts :: integer(),
-        requester :: pid(),
-        partial_upload = false :: true | false,
-        chunked_upload = false :: true | false,
-        upload_window :: non_neg_integer() | infinity,
-        partial_download = false :: true | false,
-        download_window = infinity :: timeout(),
-        part_size :: non_neg_integer() | infinity
-        %% in case of infinity we read whatever data we can get from
-        %% the wire at that point or in case of chunked one chunk
-    }).
+    req_id :: term(),
+    host :: binary(),
+    port = 80 :: integer(),
+    ssl = false :: true | false,
+    method :: binary(),
+    request :: iolist(),
+    request_headers :: headers(),
+    socket_ref,
+    socket,
+    connect_timeout = infinity :: timeout(),
+    connect_options = [] :: [any()],
+    attempts :: integer(),
+    requester :: pid(),
+    partial_upload = false :: true | false,
+    chunked_upload = false :: true | false,
+    upload_window :: non_neg_integer() | infinity,
+    partial_download = false :: true | false,
+    download_window = infinity :: timeout(),
+    part_size :: non_neg_integer() | infinity
+}).
 
 -define(CONNECTION_HDR(HDRS, DEFAULT),
     dlhttpc_lib:header_value(<<"Connection">>, HDRS, DEFAULT)).
 
+%% public
 -spec request(term(), pid(), string(), 1..65535, true | false, string(),
         string() | atom(), headers(), iolist(), [option()]) -> no_return().
-%% @spec (ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, RequestBody, Options) -> ok
-%%    ReqId = term()
-%%    From = pid()
-%%    Host = string()
-%%    Port = integer()
-%%    Ssl = boolean()
-%%    Method = atom() | string()
-%%    Hdrs = [Header]
-%%    Header = {string() | atom(), string()}
-%%    Body = iolist()
-%%    Options = [Option]
-%%    Option = {connect_timeout, Milliseconds}
-%% @end
+
 request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options),
     ok.
@@ -89,6 +75,7 @@ request(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options, Timeout
     erlang:cancel_timer(Tref),
     ok.
 
+%% private
 try_execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
     Result = try
         execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options)
@@ -126,7 +113,7 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
             Number when is_integer(Number) ->
                 case dlhttpc_disp:checkout(Host, Port, Ssl, MaxConnections, ConnectTimeout, SockOpts) of
                     {ok, Ref, S} -> {Ref, S}; % Re-using HTTP/1.1 connections
-                    {error, CheckoutErr} -> throw(CheckoutErr)
+                    {error, CheckoutErr} -> erlang:error(CheckoutErr)
                 end
         end,
     State = #client_state{
@@ -169,7 +156,7 @@ execute(ReqId, From, Host, Port, Ssl, Path, Method, Hdrs, Body, Options) ->
 
 send_request(#client_state{attempts = 0}) ->
     % Don't try again if the number of allowed attempts is 0.
-    throw(connection_closed);
+    erlang:error(connection_closed);
 send_request(#client_state{socket = undefined} = State) ->
     Host = State#client_state.host,
     Port = State#client_state.port,
@@ -182,9 +169,9 @@ send_request(#client_state{socket = undefined} = State) ->
             send_request(State#client_state{socket = Socket});
         {error, etimedout} ->
             % TCP stack decided to give up
-            throw(connect_timeout);
+            erlang:error(connect_timeout);
         {error, timeout} ->
-            throw(connect_timeout);
+            erlang:error(connect_timeout);
         {error, Reason} ->
             erlang:error(Reason)
     end;
@@ -255,7 +242,7 @@ check_send_result(_State, ok) ->
     ok;
 check_send_result(#client_state{socket = Sock, ssl = Ssl}, {error, Reason}) ->
     dlhttpc_sock:close(Sock, Ssl),
-    throw(Reason).
+    erlang:error(Reason).
 
 read_response(#client_state{socket = Socket, ssl = Ssl} = State) ->
     dlhttpc_sock:setopts(Socket, [{packet, http}, binary], Ssl),
@@ -352,13 +339,6 @@ has_body(_, _, _) ->
     true. % All other responses are assumed to have a body
 
 body_type(Hdrs) ->
-    % Find out how to read the entity body from the request.
-    % * If we have a Content-Length, just use that and read the complete
-    %   entity.
-    % * If Transfer-Encoding is set to chunked, we should read one chunk at
-    %   the time
-    % * If neither of this is true, we need to read until the socket is
-    %   closed (AFAIK, this was common in versions before 1.1).
     case dlhttpc_lib:header_value(<<"Content-Length">>, Hdrs) of
         undefined ->
             TransferEncoding =  dlhttpc_lib:header_value(<<"Transfer-Encoding">>, Hdrs, "undefined"),

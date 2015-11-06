@@ -31,7 +31,7 @@
 -type headers() :: [header()].
 
 -type result() :: {ok, {{pos_integer(), string()}, headers(), binary()}} |
-    {error, atom()}.
+    {{pid(), erlang:timestamp()}, pid()} | {error, atom()}.
 
 -type socket() :: _.
 
